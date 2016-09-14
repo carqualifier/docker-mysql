@@ -1,47 +1,38 @@
 FROM debian:jessie
 
-# add our user and group first to make sure their IDs get assigned consistently, regardless of whatever dependencies get added
-RUN groupadd -r mysql && useradd -r -g mysql mysql
+MAINTAINER Peter Szalatnay <theotherland@gmail.com>
 
-RUN mkdir /docker-entrypoint-initdb.d
+ENV DEBIAN_FRONTEND=noninteractive PERCONA_MAJOR=56
 
-# FATAL ERROR: please install the following Perl modules before executing /usr/local/mysql/scripts/mysql_install_db:
-# File::Basename
-# File::Copy
-# Sys::Hostname
-# Data::Dumper
-RUN apt-get update && apt-get install -y perl pwgen --no-install-recommends && rm -rf /var/lib/apt/lists/*
+RUN \
+    groupadd -r mysql && useradd -r -g mysql mysql \
+    && apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-keys 430BDF5C56E7C94E848EE60C1C4CBDCDCD2EFD2A \
+    && echo 'deb http://repo.percona.com/apt jessie main' > /etc/apt/sources.list.d/percona.list \
+    && apt-get update && apt-get install -y \
+        percona-xtradb-cluster-${PERCONA_MAJOR} \
+        curl \
+        sysbench \
+        jq \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /var/lib/mysql \
+    && mkdir /var/lib/mysql \
+    && sed -Ei 's/^(bind-address|log)/#&/' /etc/mysql/my.cnf \
+    && echo 'skip-host-cache\nskip-name-resolve' | awk '{ print } $1 == "[mysqld]" && c == 0 { c = 1; system("cat") }' /etc/mysql/my.cnf > /tmp/my.cnf \
+    && mv /tmp/my.cnf /etc/mysql/my.cnf \
+    && mkdir -p /opt/rancher \
+    && curl -SL https://github.com/cloudnautique/giddyup/releases/download/v0.8.0/giddyup -o /opt/rancher/giddyup \
+    && chmod +x /opt/rancher/giddyup
 
-# gpg: key 5072E1F5: public key "MySQL Release Engineering <mysql-build@oss.oracle.com>" imported
-RUN apt-key adv --keyserver ha.pool.sks-keyservers.net --recv-keys A4A9406876FCBD3C456770C88C718D3B5072E1F5
+COPY ./start_pxc /opt/rancher
 
-ENV MYSQL_MAJOR 5.7
-ENV MYSQL_VERSION 5.7.12-1debian8
+COPY ./docker-entrypoint.sh /
 
-RUN echo "deb http://repo.mysql.com/apt/debian/ jessie mysql-${MYSQL_MAJOR}" > /etc/apt/sources.list.d/mysql.list
+RUN chmod +x /docker-entrypoint.sh
 
-# the "/var/lib/mysql" stuff here is because the mysql-server postinst doesn't have an explicit way to disable the mysql_install_db codepath besides having a database already "configured" (ie, stuff in /var/lib/mysql/mysql)
-# also, we set debconf keys to make APT a little quieter
-RUN { \
-		echo mysql-community-server mysql-community-server/data-dir select ''; \
-		echo mysql-community-server mysql-community-server/root-pass password ''; \
-		echo mysql-community-server mysql-community-server/re-root-pass password ''; \
-		echo mysql-community-server mysql-community-server/remove-test-db select false; \
-	} | debconf-set-selections \
-	&& apt-get update && apt-get install -y mysql-server="${MYSQL_VERSION}" && rm -rf /var/lib/apt/lists/* \
-	&& rm -rf /var/lib/mysql && mkdir -p /var/lib/mysql
+VOLUME ["/var/lib/mysql", "/run/mysqld", "/etc/mysql/conf.d"]
 
-# comment out a few problematic configuration values
-# don't reverse lookup hostnames, they are usually another container
-RUN sed -Ei 's/^(bind-address|log)/#&/' /etc/mysql/my.cnf \
-	&& echo 'skip-host-cache\nskip-name-resolve' | awk '{ print } $1 == "[mysqld]" && c == 0 { c = 1; system("cat") }' /etc/mysql/my.cnf > /tmp/my.cnf \
-	&& mv /tmp/my.cnf /etc/mysql/my.cnf
+ENTRYPOINT ["/docker-entrypoint.sh"]
 
-VOLUME /var/lib/mysql
+EXPOSE 3306 4444 4567 4568
 
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN ln -s usr/local/bin/docker-entrypoint.sh /entrypoint.sh # backwards compat
-ENTRYPOINT ["docker-entrypoint.sh"]
-
-EXPOSE 3306
 CMD ["mysqld"]
