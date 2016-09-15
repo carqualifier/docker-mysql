@@ -9,10 +9,6 @@ MYSQL_ROOT_USER=$(curl -s -H "X-Vault-Token:$VAULT_TOKEN" http://$VAULT_NODE:820
 MYSQL_ROOT_USERNAME=$(echo $MYSQL_ROOT_USER | jq -r '.username')
 MYSQL_ROOT_PASSWORD=$(echo $MYSQL_ROOT_USER | jq -r '.password')
 
-MYSQL_SST_USER=$(curl -s -H "X-Vault-Token:$VAULT_TOKEN" http://$VAULT_NODE:8200/v1/secret/internal/carqualifier/mysql/etl/user/sst | jq -r '.data')
-MYSQL_SST_USERNAME=$(echo $MYSQL_SST_USER | jq -r '.username')
-MYSQL_SST_PASSWORD=$(echo $MYSQL_SST_USER | jq -r '.password')
-
 # if command starts with an option, prepend mysqld
 if [ "${1:0:1}" = '-' ]; then
 	set -- mysqld "$@"
@@ -29,7 +25,7 @@ if [ "$1" = 'mysqld' ]; then
 			exit 1
 		fi
 
-		if [ -z "$MYSQL_SST_PASSWORD" ]; then
+		if [ -z "$PXC_SST_PASSWORD" ]; then
 			echo >&2 'error: database is uninitialized and PXC_SST_PASSWORD not set'
 			echo >&2 '  Did you forget to add -e PXC_SST_PASSWORD=... ?'
 			exit 1
@@ -75,8 +71,8 @@ if [ "$1" = 'mysqld' ]; then
 			CREATE USER '${MYSQL_ROOT_USERNAME}'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}' ;
 			GRANT ALL ON *.* TO '${MYSQL_ROOT_USERNAME}'@'%' WITH GRANT OPTION ;
 			DROP DATABASE IF EXISTS test ;
-			CREATE USER '${MYSQL_SST_USERNAME}'@'%' IDENTIFIED BY '${MYSQL_SST_PASSWORD}' ;
-			GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO '${MYSQL_SST_USERNAME}'@'%' ;
+			CREATE USER 'sstuser'@'%' IDENTIFIED BY '${PXC_SST_PASSWORD}' ;
+			GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'sstuser'@'%' ;
 			GRANT PROCESS ON *.* TO 'clustercheckuser'@'localhost' IDENTIFIED BY 'clustercheckpassword!' ;
 			FLUSH PRIVILEGES ;
 		EOSQL
