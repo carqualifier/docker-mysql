@@ -73,10 +73,10 @@ if [ "$1" = 'mysqld' ]; then
 
 			DELETE FROM mysql.user ;
 			CREATE USER '${MYSQL_ROOT_USERNAME}'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}' ;
-			GRANT ALL ON *.* TO 'root'@'%' WITH GRANT OPTION ;
+			GRANT ALL ON *.* TO '${MYSQL_ROOT_USERNAME}'@'%' WITH GRANT OPTION ;
 			DROP DATABASE IF EXISTS test ;
 			CREATE USER '${MYSQL_SST_USERNAME}'@'%' IDENTIFIED BY '${MYSQL_SST_PASSWORD}' ;
-			GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'sstuser'@'%' ;
+			GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO '${MYSQL_SST_USERNAME}'@'%' ;
 			GRANT PROCESS ON *.* TO 'clustercheckuser'@'localhost' IDENTIFIED BY 'clustercheckpassword!' ;
 			FLUSH PRIVILEGES ;
 		EOSQL
@@ -90,11 +90,11 @@ if [ "$1" = 'mysqld' ]; then
 			mysql+=( "$MYSQL_DATABASE" )
 		fi
 
-		if [ "$MYSQL_USERNAME" -a "$MYSQL_PASSWORD" ]; then
-			echo "CREATE USER '$MYSQL_USERNAME'@'%' IDENTIFIED BY '$MYSQL_PASSWORD' ;" | "${mysql[@]}"
+		if [ "$MYSQL_ETL_USERNAME" -a "$MYSQL_ETL_PASSWORD" ]; then
+			echo "CREATE USER '$MYSQL_ETL_USERNAME'@'%' IDENTIFIED BY '$MYSQL_ETL_PASSWORD' ;" | "${mysql[@]}"
 
 			if [ "$MYSQL_DATABASE" ]; then
-				echo "GRANT ALL ON \`$MYSQL_DATABASE\`.* TO '$MYSQL_USERNAME'@'%' ;" | "${mysql[@]}"
+				echo "GRANT ALL ON \`$MYSQL_DATABASE\`.* TO '$MYSQL_ETL_USERNAME'@'%' ;" | "${mysql[@]}"
 			fi
 
 			echo 'FLUSH PRIVILEGES ;' | "${mysql[@]}"
