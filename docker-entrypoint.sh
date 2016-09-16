@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 
-MYSQL_ETL_USER=$(curl -s -H "X-Vault-Token:$VAULT_TOKEN" http://$VAULT_NODE:8200/v1/secret/internal/carqualifier/mysql/etl/user/general | jq -r '.data')
-MYSQL_ETL_USERNAME=$(echo $MYSQL_ETL_USER | jq -r '.username')
-MYSQL_ETL_PASSWORD=$(echo $MYSQL_ETL_USER | jq -r '.password')
+MYSQL_TYPE_USER=$(curl -s -H "X-Vault-Token:$VAULT_TOKEN" http://$VAULT_NODE:8200/v1/secret/internal/carqualifier/mysql/${DB_TYPE}/user/general | jq -r '.data')
+MYSQL_TYPE_USERNAME=$(echo $MYSQL_TYPE_USER | jq -r '.username')
+MYSQL_TYPE_PASSWORD=$(echo $MYSQL_TYPE_USER | jq -r '.password')
 
-MYSQL_ROOT_USER=$(curl -s -H "X-Vault-Token:$VAULT_TOKEN" http://$VAULT_NODE:8200/v1/secret/internal/carqualifier/mysql/etl/user/root | jq -r '.data')
+MYSQL_ROOT_USER=$(curl -s -H "X-Vault-Token:$VAULT_TOKEN" http://$VAULT_NODE:8200/v1/secret/internal/carqualifier/mysql/${DB_TYPE}/user/root | jq -r '.data')
 MYSQL_ROOT_USERNAME=$(echo $MYSQL_ROOT_USER | jq -r '.username')
 MYSQL_ROOT_PASSWORD=$(echo $MYSQL_ROOT_USER | jq -r '.password')
 
@@ -86,11 +86,11 @@ if [ "$1" = 'mysqld' ]; then
 			mysql+=( "$MYSQL_DATABASE" )
 		fi
 
-		if [ "$MYSQL_ETL_USERNAME" -a "$MYSQL_ETL_PASSWORD" ]; then
-			echo "CREATE USER '$MYSQL_ETL_USERNAME'@'%' IDENTIFIED BY '$MYSQL_ETL_PASSWORD' ;" | "${mysql[@]}"
+		if [ "$MYSQL_TYPE_USERNAME" -a "$MYSQL_TYPE_PASSWORD" ]; then
+			echo "CREATE USER '$MYSQL_TYPE_USERNAME'@'%' IDENTIFIED BY '$MYSQL_TYPE_PASSWORD' ;" | "${mysql[@]}"
 
 			if [ "$MYSQL_DATABASE" ]; then
-				echo "GRANT ALL ON \`$MYSQL_DATABASE\`.* TO '$MYSQL_ETL_USERNAME'@'%' ;" | "${mysql[@]}"
+				echo "GRANT ALL ON \`$MYSQL_DATABASE\`.* TO '$MYSQL_TYPE_USERNAME'@'%' ;" | "${mysql[@]}"
 			fi
 
 			echo 'FLUSH PRIVILEGES ;' | "${mysql[@]}"
